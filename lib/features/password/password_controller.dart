@@ -29,8 +29,8 @@ class PasswordController extends ChangeNotifier {
   /// Include special/symbol characters.
   bool useSymbols = false;
 
-  /// Characters explicitly excluded from the pool (default: "lIO0").
-  String excludedChars = 'lIO0';
+  /// Characters explicitly excluded from the pool. Empty by default.
+  String excludedChars = '';
 
   // -------------------------------------------------------------------------
   // Output state

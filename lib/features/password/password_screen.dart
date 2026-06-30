@@ -1,173 +1,463 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'password_controller.dart';
-import '../../shared/widgets/app_button.dart';
-import '../../shared/widgets/output_box.dart';
 
-/// Password Generator screen.
-///
-/// Uses [Consumer<PasswordController>] to rebuild reactively whenever the
-/// controller calls [notifyListeners]. All UI controls map directly to
-/// controller setter/toggle methods — no local state needed.
+import '../../shared/utils/clipboard_helper.dart';
+import 'password_controller.dart';
+
+const _background = Color(0xFFF8FAFC);
+const _surface = Colors.white;
+const _primary = Color(0xFF2563EB);
+const _text = Color(0xFF0F172A);
+const _muted = Color(0xFF64748B);
+const _label = Color(0xFF334155);
+const _border = Color(0xFFE2E8F0);
+const _controlBorder = Color(0xFFCBD5E1);
+const _successBg = Color(0xFFDCFCE7);
+const _successText = Color(0xFF166534);
+const _errorBg = Color(0xFFFEF2F2);
+const _errorBorder = Color(0xFFFECACA);
+const _errorText = Color(0xFFB91C1C);
+
 class PasswordScreen extends StatelessWidget {
   const PasswordScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Consumer<PasswordController>(
-      builder: (context, ctrl, _) {
-        return ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            // ---------------------------------------------------------------
-            // Header
-            // ---------------------------------------------------------------
-            Text(
-              'Password Generator',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 24),
+      builder: (context, controller, _) {
+        return _ToolPage(
+          title: 'Password Generator',
+          subtitle: 'Create secure passwords using local device randomness.',
+          badge: 'Local Tools',
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 920;
+              final settings = _PasswordSettingsCard(controller: controller);
+              final output = _GeneratedPasswordCard(controller: controller);
+              final validation = _ValidationCard(error: controller.error);
 
-            // ---------------------------------------------------------------
-            // Length slider
-            // ---------------------------------------------------------------
-            _SectionLabel('Length: ${ctrl.length}'),
-            Slider(
-              value: ctrl.length.toDouble(),
-              min: 4,
-              max: 128,
-              divisions: 124,
-              label: ctrl.length.toString(),
-              onChanged: (v) => ctrl.setLength(v.round()),
-            ),
-            const SizedBox(height: 16),
-
-            // ---------------------------------------------------------------
-            // Character type toggles
-            // ---------------------------------------------------------------
-            _SectionLabel('Character Types'),
-            const SizedBox(height: 4),
-            _ToggleRow(
-              label: 'Uppercase (A-Z)',
-              value: ctrl.useUppercase,
-              onChanged: ctrl.toggleUppercase,
-            ),
-            _ToggleRow(
-              label: 'Lowercase (a-z)',
-              value: ctrl.useLowercase,
-              onChanged: ctrl.toggleLowercase,
-            ),
-            _ToggleRow(
-              label: 'Digits (0-9)',
-              value: ctrl.useDigits,
-              onChanged: ctrl.toggleDigits,
-            ),
-            _ToggleRow(
-              label: 'Symbols (!@#\$%…)',
-              value: ctrl.useSymbols,
-              onChanged: ctrl.toggleSymbols,
-            ),
-            const SizedBox(height: 16),
-
-            // ---------------------------------------------------------------
-            // Excluded characters field
-            // ---------------------------------------------------------------
-            _SectionLabel('Excluded Characters'),
-            const SizedBox(height: 8),
-            TextField(
-              controller: TextEditingController(text: ctrl.excludedChars),
-              decoration: const InputDecoration(
-                hintText: 'e.g.  l I O 0',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-              onChanged: ctrl.setExcludedChars,
-            ),
-            const SizedBox(height: 24),
-
-            // ---------------------------------------------------------------
-            // Generate button
-            // ---------------------------------------------------------------
-            AppButton(
-              label: 'Generate Password',
-              icon: Icons.refresh,
-              onPressed: ctrl.generate,
-            ),
-            const SizedBox(height: 20),
-
-            // ---------------------------------------------------------------
-            // Error display
-            // ---------------------------------------------------------------
-            if (ctrl.error != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .errorContainer
-                      .withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
+              if (!isWide) {
+                return Column(
                   children: [
-                    Icon(Icons.warning_amber_rounded,
-                        color: Theme.of(context).colorScheme.error, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        ctrl.error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ),
+                    settings,
+                    const SizedBox(height: 20),
+                    output,
+                    const SizedBox(height: 20),
+                    validation,
                   ],
-                ),
-              ),
+                );
+              }
 
-            // ---------------------------------------------------------------
-            // Output
-            // ---------------------------------------------------------------
-            if (ctrl.generatedPassword.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              _SectionLabel('Generated Password'),
-              const SizedBox(height: 8),
-              OutputBox(text: ctrl.generatedPassword),
-            ],
-          ],
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(width: 500, child: settings),
+                  const SizedBox(width: 32),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        output,
+                        const SizedBox(height: 32),
+                        validation,
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         );
       },
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Small private helper widgets
-// ---------------------------------------------------------------------------
+class _PasswordSettingsCard extends StatelessWidget {
+  const _PasswordSettingsCard({required this.controller});
 
-/// A thin label used to title each settings section.
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
+  final PasswordController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _CardTitle('Password Settings'),
+          const SizedBox(height: 6),
+          const _BodyText('Choose length, character types, and exclusions.'),
+          const SizedBox(height: 34),
+          const _FieldLabel('Password Length'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: _primary,
+                    inactiveTrackColor: _border,
+                    thumbColor: _surface,
+                    overlayColor: _primary.withValues(alpha: 0.12),
+                    trackHeight: 6,
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 11,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 18,
+                    ),
+                  ),
+                  child: Slider(
+                    value: controller.length.toDouble(),
+                    min: 4,
+                    max: 128,
+                    divisions: 124,
+                    label: controller.length.toString(),
+                    onChanged: (value) => controller.setLength(value.round()),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              _NumberPill(value: controller.length.toString()),
+            ],
+          ),
+          const SizedBox(height: 30),
+          const _FieldLabel('Character Types'),
+          const SizedBox(height: 14),
+          _CheckRow(
+            label: 'Uppercase Letters',
+            value: controller.useUppercase,
+            onChanged: controller.toggleUppercase,
+          ),
+          _CheckRow(
+            label: 'Lowercase Letters',
+            value: controller.useLowercase,
+            onChanged: controller.toggleLowercase,
+          ),
+          _CheckRow(
+            label: 'Numbers',
+            value: controller.useDigits,
+            onChanged: controller.toggleDigits,
+          ),
+          _CheckRow(
+            label: 'Special Symbols',
+            value: controller.useSymbols,
+            onChanged: controller.toggleSymbols,
+          ),
+          const SizedBox(height: 24),
+          const _FieldLabel('Excluded Characters'),
+          const SizedBox(height: 8),
+          _TextInput(
+            initialValue: controller.excludedChars,
+            hintText: 'ex. 0OL1',
+            onChanged: controller.setExcludedChars,
+          ),
+          const SizedBox(height: 14),
+          const _Caption(
+            'Avoid confusing characters like lowercase l, uppercase I, O, and zero.',
+          ),
+          const SizedBox(height: 28),
+          _PrimaryButton(
+            label: 'Generate Password',
+            onPressed: controller.generate,
+            width: 200,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GeneratedPasswordCard extends StatelessWidget {
+  const _GeneratedPasswordCard({required this.controller});
+
+  final PasswordController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPassword = controller.generatedPassword.isNotEmpty;
+
+    return _Card(
+      minHeight: 220,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: _CardTitle('Generated Password')),
+              _StatusBadge(
+                label: hasPassword ? 'Strong' : 'Ready',
+                background: hasPassword ? _successBg : const Color(0xFFDBEAFE),
+                foreground: hasPassword
+                    ? _successText
+                    : const Color(0xFF1D4ED8),
+              ),
+            ],
+          ),
+          const SizedBox(height: 26),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _OutputField(
+                  text: hasPassword
+                      ? controller.generatedPassword
+                      : 'No password generated yet.',
+                  isPlaceholder: !hasPassword,
+                ),
+              ),
+              const SizedBox(width: 12),
+              _SecondaryButton(
+                label: 'Copy',
+                width: 84,
+                onPressed: hasPassword
+                    ? () => ClipboardHelper.copyWithFeedback(
+                        context,
+                        controller.generatedPassword,
+                      )
+                    : null,
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          const _Caption('Passwords are generated locally and are not stored.'),
+        ],
+      ),
+    );
+  }
+}
+
+class _ValidationCard extends StatelessWidget {
+  const _ValidationCard({required this.error});
+
+  final String? error;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Card(
+      minHeight: 212,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _CardTitle('Built-in validation states'),
+          const SizedBox(height: 12),
+          const _BodyText(
+            'Length limits, no character type selected, and exclusion conflicts are handled with friendly inline errors.',
+          ),
+          const SizedBox(height: 28),
+          _ErrorBox(
+            message: error ?? 'Validation messages appear here when needed.',
+            isPlaceholder: error == null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToolPage extends StatelessWidget {
+  const _ToolPage({
+    required this.title,
+    required this.subtitle,
+    required this.badge,
+    required this.child,
+  });
+
+  final String title;
+  final String subtitle;
+  final String badge;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: _background,
+      child: Column(
+        children: [
+          Container(
+            constraints: const BoxConstraints(minHeight: 80),
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            decoration: const BoxDecoration(
+              color: _surface,
+              border: Border(bottom: BorderSide(color: _border)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: _text,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: _muted,
+                          fontSize: 13,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _StatusBadge(
+                  label: badge,
+                  background: _successBg,
+                  foreground: _successText,
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1056),
+                  child: child,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Card extends StatelessWidget {
+  const _Card({required this.child, this.minHeight});
+
+  final Widget child;
+  final double? minHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(minHeight: minHeight ?? 0),
+      width: double.infinity,
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _CardTitle extends StatelessWidget {
+  const _CardTitle(this.text);
   final String text;
 
   @override
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.2,
-          ),
+      style: const TextStyle(
+        color: _text,
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0,
+      ),
     );
   }
 }
 
-/// A row with a label on the left and a [Switch] on the right.
-class _ToggleRow extends StatelessWidget {
-  const _ToggleRow({
+class _BodyText extends StatelessWidget {
+  const _BodyText(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: _muted,
+        fontSize: 14,
+        height: 1.35,
+        letterSpacing: 0,
+      ),
+    );
+  }
+}
+
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: _label,
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0,
+      ),
+    );
+  }
+}
+
+class _Caption extends StatelessWidget {
+  const _Caption(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: _muted,
+        fontSize: 12,
+        height: 1.35,
+        letterSpacing: 0,
+      ),
+    );
+  }
+}
+
+class _NumberPill extends StatelessWidget {
+  const _NumberPill({required this.value});
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 56,
+      height: 42,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _controlBorder),
+      ),
+      child: Text(
+        value,
+        style: const TextStyle(
+          color: _text,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckRow extends StatelessWidget {
+  const _CheckRow({
     required this.label,
     required this.value,
     required this.onChanged,
@@ -179,12 +469,261 @@ class _ToggleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SwitchListTile.adaptive(
-      title: Text(label),
-      value: value,
-      onChanged: onChanged,
-      dense: true,
-      contentPadding: EdgeInsets.zero,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => onChanged(!value),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: Checkbox(
+                value: value,
+                onChanged: (next) => onChanged(next ?? false),
+                activeColor: _primary,
+                side: const BorderSide(color: _controlBorder),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: const TextStyle(
+                color: _label,
+                fontSize: 14,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
+}
+
+class _TextInput extends StatelessWidget {
+  const _TextInput({
+    required this.initialValue,
+    required this.hintText,
+    required this.onChanged,
+  });
+
+  final String initialValue;
+  final String hintText;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      initialValue: initialValue,
+      onChanged: onChanged,
+      cursorColor: _primary,
+      style: const TextStyle(color: _text, fontSize: 14, letterSpacing: 0),
+      decoration: _inputDecoration(hintText: hintText),
+    );
+  }
+}
+
+class _OutputField extends StatelessWidget {
+  const _OutputField({required this.text, required this.isPlaceholder});
+
+  final String text;
+  final bool isPlaceholder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 56),
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: _background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _controlBorder),
+      ),
+      child: SelectableText(
+        text,
+        style: TextStyle(
+          color: isPlaceholder ? _muted : _text,
+          fontSize: 17,
+          height: 1.35,
+          fontFamily: 'monospace',
+          letterSpacing: 0,
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorBox extends StatelessWidget {
+  const _ErrorBox({required this.message, required this.isPlaceholder});
+
+  final String message;
+  final bool isPlaceholder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        color: isPlaceholder ? _background : _errorBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isPlaceholder ? _border : _errorBorder),
+      ),
+      child: Text(
+        message,
+        style: TextStyle(
+          color: isPlaceholder ? _muted : _errorText,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0,
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({
+    required this.label,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String label;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: foreground,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
+        ),
+      ),
+    );
+  }
+}
+
+class _PrimaryButton extends StatelessWidget {
+  const _PrimaryButton({
+    required this.label,
+    required this.onPressed,
+    required this.width,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: 44,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          backgroundColor: _primary,
+          foregroundColor: _surface,
+          disabledBackgroundColor: _primary.withValues(alpha: 0.42),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SecondaryButton extends StatelessWidget {
+  const _SecondaryButton({
+    required this.label,
+    required this.onPressed,
+    required this.width,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: 44,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: _label,
+          disabledForegroundColor: _muted.withValues(alpha: 0.45),
+          side: BorderSide(
+            color: onPressed == null
+                ? _controlBorder.withValues(alpha: 0.55)
+                : _controlBorder,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+InputDecoration _inputDecoration({String? hintText}) {
+  return InputDecoration(
+    hintText: hintText,
+    hintStyle: TextStyle(
+      color: _muted.withValues(alpha: 0.62),
+      fontSize: 14,
+      letterSpacing: 0,
+    ),
+    filled: true,
+    fillColor: _surface,
+    isDense: true,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: _controlBorder),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: _primary),
+    ),
+  );
 }

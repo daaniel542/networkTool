@@ -1,7 +1,17 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:convert/convert.dart';
-import 'converter_controller.dart';
+
+/// Supported converter operations per PRD section 10.3.
+enum ConverterOperation {
+  base64Encode,
+  base64Decode,
+  hexEncode,
+  hexDecode,
+  md5,
+  sha1,
+  sha256,
+}
 
 /// Thrown when [ConverterService.execute] encounters invalid input.
 class ConverterServiceException implements Exception {
@@ -13,9 +23,9 @@ class ConverterServiceException implements Exception {
 
 /// Handles Base64 (encode/decode), Hex (encode/decode), MD5, SHA-1, SHA-256.
 ///
-/// All operations are wrapped in try/catch blocks so malformed input produces
-/// user-friendly [ConverterServiceException]s rather than runtime crashes,
-/// per PRD section 10.3.
+/// All decoding operations are wrapped in try/catch so malformed input produces
+/// user-friendly [ConverterServiceException]s rather than runtime crashes
+/// (PRD §10.3).
 class ConverterService {
   /// Execute [operation] against [input] and return the result string.
   ///
@@ -25,45 +35,40 @@ class ConverterService {
     required ConverterOperation operation,
   }) {
     try {
-      switch (operation) {
-        case ConverterOperation.base64Encode:
-          return base64.encode(utf8.encode(input));
-
-        case ConverterOperation.base64Decode:
-          try {
-            final bytes = base64.decode(input.trim());
-            return utf8.decode(bytes);
-          } catch (_) {
-            throw const ConverterServiceException('Invalid Base64 input.');
-          }
-
-        case ConverterOperation.hexEncode:
-          return hex.encode(utf8.encode(input));
-
-        case ConverterOperation.hexDecode:
-          try {
-            final bytes = hex.decode(input.trim().replaceAll(' ', ''));
-            return utf8.decode(bytes);
-          } catch (_) {
-            throw const ConverterServiceException('Invalid hex input.');
-          }
-
-        case ConverterOperation.md5:
-          final digest = md5.convert(utf8.encode(input));
-          return digest.toString();
-
-        case ConverterOperation.sha1:
-          final digest = sha1.convert(utf8.encode(input));
-          return digest.toString();
-
-        case ConverterOperation.sha256:
-          final digest = sha256.convert(utf8.encode(input));
-          return digest.toString();
-      }
+      return switch (operation) {
+        ConverterOperation.base64Encode => base64.encode(utf8.encode(input)),
+        ConverterOperation.base64Decode => _decodeBase64(input),
+        ConverterOperation.hexEncode => hex.encode(utf8.encode(input)),
+        ConverterOperation.hexDecode => _decodeHex(input),
+        ConverterOperation.md5 => md5Hash.convert(utf8.encode(input)).toString(),
+        ConverterOperation.sha1 => sha1Hash.convert(utf8.encode(input)).toString(),
+        ConverterOperation.sha256 => sha256Hash.convert(utf8.encode(input)).toString(),
+      };
     } on ConverterServiceException {
       rethrow;
     } catch (e) {
       throw ConverterServiceException('Unexpected error: $e');
     }
   }
+
+  String _decodeBase64(String input) {
+    try {
+      return utf8.decode(base64.decode(input.trim()));
+    } catch (_) {
+      throw const ConverterServiceException('Invalid Base64 input.');
+    }
+  }
+
+  String _decodeHex(String input) {
+    try {
+      return utf8.decode(hex.decode(input.trim().replaceAll(' ', '')));
+    } catch (_) {
+      throw const ConverterServiceException('Invalid hex input.');
+    }
+  }
+
+  // Aliases to avoid name clashes with the enum values.
+  static const md5Hash = md5;
+  static const sha1Hash = sha1;
+  static const sha256Hash = sha256;
 }

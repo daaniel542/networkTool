@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:net_utility_toolkit/features/converter/converter_service.dart';
-import 'package:net_utility_toolkit/features/converter/converter_controller.dart';
 
 void main() {
   group('ConverterService', () {

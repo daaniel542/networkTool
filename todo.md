@@ -51,16 +51,16 @@ You are an expert Flutter & Dart engineer. Your task is to build the "Net Utilit
 
 **Goal:** Build the completely offline Password Generator.
 
-- [ ] Write `lib/features/password/password_service.dart`:
+- [x] Write `lib/features/password/password_service.dart`:
   - Must use `dart:math` `Random.secure()`.
   - Parameters: length, booleans for upper/lower/numbers/special, and a string of excluded characters.
   - Throw clear `Exception` messages if length is out of bounds (4-128) or if the character pool is empty.
-- [ ] Write `lib/features/password/password_controller.dart`:
+- [x] Write `lib/features/password/password_controller.dart`:
   - Extend `ChangeNotifier`.
   - Hold UI state (sliders, checkboxes, output string, error string).
-- [ ] Write `lib/features/password/password_screen.dart`:
+- [x] Write `lib/features/password/password_screen.dart`:
   - Wire up the UI to the controller using `Consumer<PasswordController>`.
-- [ ] Write `test/password_service_test.dart`: Unit tests confirming exclusions work and lengths are respected.
+- [x] Write `test/password_service_test.dart`: Unit tests confirming exclusions work and lengths are respected.
 
 ---
 
@@ -68,15 +68,15 @@ You are an expert Flutter & Dart engineer. Your task is to build the "Net Utilit
 
 **Goal:** Build the offline string manipulation tool.
 
-- [ ] Write `lib/features/converter/converter_service.dart`:
+- [x] Write `lib/features/converter/converter_service.dart`:
   - Implement Base64 Encode/Decode, Hex Encode/Decode, MD5, SHA-1, SHA-256 using the `crypto` and `convert` packages.
   - Wrap decoding in `try/catch` to return clean error strings (e.g., "Invalid Base64 input").
-- [ ] Write `lib/features/converter/converter_controller.dart`:
+- [x] Write `lib/features/converter/converter_controller.dart`:
   - Extend `ChangeNotifier`.
   - Enforce a 50,000 character limit on the input.
 - [ ] Write `lib/features/converter/converter_screen.dart`:
   - Include an input `TextField`, a dropdown for the operation, a Convert button, and an `OutputBox`.
-- [ ] Write `test/converter_service_test.dart`: Unit tests for hashing and encode/decode operations.
+- [x] Write `test/converter_service_test.dart`: Unit tests for hashing and encode/decode operations.
 
 ---
 
