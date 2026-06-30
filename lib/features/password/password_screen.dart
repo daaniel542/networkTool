@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../shared/utils/clipboard_helper.dart';
@@ -117,7 +118,10 @@ class _PasswordSettingsCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              _NumberPill(value: controller.length.toString()),
+              _LengthInput(
+                value: controller.length,
+                onChanged: controller.setLength,
+              ),
             ],
           ),
           const SizedBox(height: 30),
@@ -428,28 +432,100 @@ class _Caption extends StatelessWidget {
   }
 }
 
-class _NumberPill extends StatelessWidget {
-  const _NumberPill({required this.value});
-  final String value;
+class _LengthInput extends StatefulWidget {
+  const _LengthInput({required this.value, required this.onChanged});
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  State<_LengthInput> createState() => _LengthInputState();
+}
+
+class _LengthInputState extends State<_LengthInput> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value.toString());
+    _focusNode = FocusNode()..addListener(_handleFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(covariant _LengthInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.value != oldWidget.value && !_focusNode.hasFocus) {
+      _setText(widget.value.toString());
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode
+      ..removeListener(_handleFocusChange)
+      ..dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    if (!_focusNode.hasFocus) {
+      _commit();
+    }
+  }
+
+  void _handleChanged(String rawValue) {
+    final value = int.tryParse(rawValue);
+    if (value == null) {
+      return;
+    }
+
+    widget.onChanged(value.clamp(4, 128));
+  }
+
+  void _commit() {
+    final value = int.tryParse(_controller.text);
+    final normalized = (value ?? widget.value).clamp(4, 128);
+
+    widget.onChanged(normalized);
+    _setText(normalized.toString());
+  }
+
+  void _setText(String value) {
+    _controller.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 56,
+    return SizedBox(
+      width: 72,
       height: 42,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _controlBorder),
-      ),
-      child: Text(
-        value,
+      child: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        keyboardType: TextInputType.number,
+        textAlign: TextAlign.center,
+        cursorColor: _primary,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(3),
+        ],
+        onChanged: _handleChanged,
+        onEditingComplete: _commit,
         style: const TextStyle(
           color: _text,
           fontSize: 14,
           fontWeight: FontWeight.w600,
           letterSpacing: 0,
+        ),
+        decoration: _inputDecoration().copyWith(
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
         ),
       ),
     );
