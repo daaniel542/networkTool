@@ -1,37 +1,34 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../utils/clipboard_helper.dart';
 
-/// A selectable, copyable text box for displaying operation results.
+/// A styled, selectable text container for displaying operation results.
 ///
-/// Used in the password generator and converter output panels. Content is
-/// rendered in a monospaced font as required by PRD section 11.
+/// Shows [text] in a monospaced font inside a bordered container. When text
+/// is present a copy button appears; it delegates to [ClipboardHelper] so
+/// the SnackBar feedback is shown automatically.
 class OutputBox extends StatelessWidget {
   const OutputBox({
     super.key,
     required this.text,
     this.placeholder = 'Output will appear here…',
-    this.onCopy,
   });
 
   final String text;
   final String placeholder;
 
-  /// Optional callback invoked after the text is copied. If null, the default
-  /// [Clipboard.setData] behaviour is used and a SnackBar is shown.
-  final VoidCallback? onCopy;
-
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isEmpty = text.isEmpty;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+          color: theme.colorScheme.outline.withValues(alpha: 0.35),
         ),
       ),
       child: Row(
@@ -42,36 +39,22 @@ class OutputBox extends StatelessWidget {
               isEmpty ? placeholder : text,
               style: TextStyle(
                 fontFamily: 'monospace',
+                fontSize: 13,
+                height: 1.5,
                 color: isEmpty
-                    ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)
-                    : Theme.of(context).colorScheme.onSurface,
+                    ? theme.colorScheme.onSurface.withValues(alpha: 0.4)
+                    : theme.colorScheme.onSurface,
               ),
             ),
           ),
           if (!isEmpty)
             IconButton(
               tooltip: 'Copy to clipboard',
-              icon: const Icon(Icons.copy, size: 18),
-              onPressed: () => _copy(context),
+              icon: const Icon(Icons.copy_outlined, size: 18),
+              onPressed: () => ClipboardHelper.copyWithFeedback(context, text),
             ),
         ],
       ),
     );
-  }
-
-  Future<void> _copy(BuildContext context) async {
-    if (onCopy != null) {
-      onCopy!();
-    } else {
-      await Clipboard.setData(ClipboardData(text: text));
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Copied to clipboard'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    }
   }
 }

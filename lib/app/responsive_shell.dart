@@ -3,11 +3,14 @@ import '../features/network/network_screen.dart';
 import '../features/password/password_screen.dart';
 import '../features/converter/converter_screen.dart';
 
-/// Breakpoint below which the layout switches to mobile (bottom nav bar).
-const double _kMobileBreakpoint = 720.0;
+/// Width at which the layout switches from mobile bottom-nav to desktop rail.
+const double _kDesktopBreakpoint = 720.0;
 
-/// The top-level scaffold that adapts between a desktop sidebar layout and a
-/// mobile bottom-navigation-bar layout based on the available screen width.
+/// Top-level responsive layout shell.
+///
+/// On wide screens (≥ [_kDesktopBreakpoint]) it renders a persistent
+/// [NavigationRail] on the left. On narrow screens it shows a [NavigationBar]
+/// at the bottom. The active screen fills the remaining space.
 class ResponsiveShell extends StatefulWidget {
   const ResponsiveShell({super.key});
 
@@ -18,97 +21,85 @@ class ResponsiveShell extends StatefulWidget {
 class _ResponsiveShellState extends State<ResponsiveShell> {
   int _selectedIndex = 0;
 
-  static const List<_NavItem> _navItems = [
-    _NavItem(label: 'Network Tools', icon: Icons.wifi),
-    _NavItem(label: 'Password Gen', icon: Icons.lock_outline),
-    _NavItem(label: 'Encoding', icon: Icons.code),
+  static const _destinations = [
+    (label: 'Network Tools', icon: Icons.wifi_outlined, selectedIcon: Icons.wifi),
+    (label: 'Password Gen', icon: Icons.lock_outlined, selectedIcon: Icons.lock),
+    (label: 'Encoding', icon: Icons.code_outlined, selectedIcon: Icons.code),
   ];
 
-  static const List<Widget> _screens = [
+  // Screens are instantiated once here. Controllers are obtained via
+  // Provider.of<T> inside each screen — no need to pass them as constructor
+  // arguments, which also means this list does not need to be const.
+  final _screens = const [
     NetworkScreen(),
     PasswordScreen(),
     ConverterScreen(),
   ];
 
+  void _onDestinationSelected(int index) =>
+      setState(() => _selectedIndex = index);
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth >= _kMobileBreakpoint;
-
-        if (isDesktop) {
-          return _DesktopLayout(
-            navItems: _navItems,
+        if (constraints.maxWidth >= _kDesktopBreakpoint) {
+          return _DesktopScaffold(
+            destinations: _destinations,
             selectedIndex: _selectedIndex,
-            screens: _screens,
-            onDestinationSelected: (index) =>
-                setState(() => _selectedIndex = index),
-          );
-        } else {
-          return _MobileLayout(
-            navItems: _navItems,
-            selectedIndex: _selectedIndex,
-            screens: _screens,
-            onDestinationSelected: (index) =>
-                setState(() => _selectedIndex = index),
+            onDestinationSelected: _onDestinationSelected,
+            child: _screens[_selectedIndex],
           );
         }
+        return _MobileScaffold(
+          destinations: _destinations,
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: _onDestinationSelected,
+          child: _screens[_selectedIndex],
+        );
       },
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// Desktop layout — persistent left sidebar
+// Desktop — NavigationRail sidebar
 // ---------------------------------------------------------------------------
 
-class _DesktopLayout extends StatelessWidget {
-  const _DesktopLayout({
-    required this.navItems,
+class _DesktopScaffold extends StatelessWidget {
+  const _DesktopScaffold({
+    required this.destinations,
     required this.selectedIndex,
-    required this.screens,
     required this.onDestinationSelected,
+    required this.child,
   });
 
-  final List<_NavItem> navItems;
+  final List<({String label, IconData icon, IconData selectedIcon})> destinations;
   final int selectedIndex;
-  final List<Widget> screens;
   final ValueChanged<int> onDestinationSelected;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       body: Row(
         children: [
           NavigationRail(
+            extended: true,
+            minExtendedWidth: 210,
             selectedIndex: selectedIndex,
             onDestinationSelected: onDestinationSelected,
-            extended: true,
-            minExtendedWidth: 200,
-            backgroundColor: theme.colorScheme.surface,
-            leading: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24.0),
-              child: Text(
-                'Net Utility\nToolkit',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-            destinations: navItems
-                .map((item) => NavigationRailDestination(
-                      icon: Icon(item.icon),
-                      label: Text(item.label),
+            leading: const _AppLogo(),
+            destinations: destinations
+                .map((d) => NavigationRailDestination(
+                      icon: Icon(d.icon),
+                      selectedIcon: Icon(d.selectedIcon),
+                      label: Text(d.label),
                     ))
                 .toList(),
           ),
-          const VerticalDivider(thickness: 1, width: 1),
-          Expanded(child: screens[selectedIndex]),
+          const VerticalDivider(width: 1, thickness: 1),
+          Expanded(child: child),
         ],
       ),
     );
@@ -116,33 +107,34 @@ class _DesktopLayout extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Mobile layout — bottom navigation bar, stacked content
+// Mobile — NavigationBar at the bottom
 // ---------------------------------------------------------------------------
 
-class _MobileLayout extends StatelessWidget {
-  const _MobileLayout({
-    required this.navItems,
+class _MobileScaffold extends StatelessWidget {
+  const _MobileScaffold({
+    required this.destinations,
     required this.selectedIndex,
-    required this.screens,
     required this.onDestinationSelected,
+    required this.child,
   });
 
-  final List<_NavItem> navItems;
+  final List<({String label, IconData icon, IconData selectedIcon})> destinations;
   final int selectedIndex;
-  final List<Widget> screens;
   final ValueChanged<int> onDestinationSelected;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: screens[selectedIndex],
+      body: child,
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
         onDestinationSelected: onDestinationSelected,
-        destinations: navItems
-            .map((item) => NavigationDestination(
-                  icon: Icon(item.icon),
-                  label: item.label,
+        destinations: destinations
+            .map((d) => NavigationDestination(
+                  icon: Icon(d.icon),
+                  selectedIcon: Icon(d.selectedIcon),
+                  label: d.label,
                 ))
             .toList(),
       ),
@@ -151,12 +143,33 @@ class _MobileLayout extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Simple data class for navigation items
+// App logo / brand mark in the sidebar header
 // ---------------------------------------------------------------------------
 
-class _NavItem {
-  const _NavItem({required this.label, required this.icon});
+class _AppLogo extends StatelessWidget {
+  const _AppLogo();
 
-  final String label;
-  final IconData icon;
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      child: Row(
+        children: [
+          Icon(Icons.router_outlined, color: color, size: 22),
+          const SizedBox(width: 10),
+          Text(
+            'Net Utility\nToolkit',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+              height: 1.4,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

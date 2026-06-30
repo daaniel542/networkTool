@@ -3,9 +3,8 @@ import 'password_service.dart';
 
 /// Controller for the Password Generator screen.
 ///
-/// Holds all configurable inputs (length, character set toggles, exclusion
-/// list) and exposes the generated password string. Generation is delegated
-/// to [PasswordService] which uses [Random.secure()] internally.
+/// Holds all configurable UI state (slider value, checkbox booleans, exclusion
+/// string, output, error) and delegates generation to [PasswordService].
 class PasswordController extends ChangeNotifier {
   PasswordController({required PasswordService service}) : _service = service;
 
@@ -30,7 +29,7 @@ class PasswordController extends ChangeNotifier {
   /// Include special/symbol characters.
   bool useSymbols = false;
 
-  /// Characters explicitly excluded from the pool (e.g. "lIO0" by default).
+  /// Characters explicitly excluded from the pool (default: "lIO0").
   String excludedChars = 'lIO0';
 
   // -------------------------------------------------------------------------
@@ -68,13 +67,35 @@ class PasswordController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Update [length] and notify listeners.
+  // -------------------------------------------------------------------------
+  // Setters — each notifies listeners so Consumer rebuilds automatically
+  // -------------------------------------------------------------------------
+
   void setLength(int value) {
     length = value.clamp(4, 128);
     notifyListeners();
   }
 
-  /// Update [excludedChars] and notify listeners.
+  void toggleUppercase(bool value) {
+    useUppercase = value;
+    notifyListeners();
+  }
+
+  void toggleLowercase(bool value) {
+    useLowercase = value;
+    notifyListeners();
+  }
+
+  void toggleDigits(bool value) {
+    useDigits = value;
+    notifyListeners();
+  }
+
+  void toggleSymbols(bool value) {
+    useSymbols = value;
+    notifyListeners();
+  }
+
   void setExcludedChars(String value) {
     excludedChars = value;
     notifyListeners();
