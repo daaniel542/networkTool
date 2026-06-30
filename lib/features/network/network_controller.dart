@@ -1,27 +1,28 @@
+import 'package:dart_ping/dart_ping.dart';
 import 'package:flutter/foundation.dart';
-import 'ping_service.dart';
-import 'dns_service.dart';
 
-/// Supported DNS record types per PRD section 10.1.
-enum DnsRecordType { a, aaaa, cname, mx, txt, ns }
+import 'dns_service.dart';
+import 'ping_service.dart';
+
+enum NetworkToolMode { ping, dns }
 
 /// Controller for the Network Tools screen.
 ///
-/// Manages ping state, DNS lookup state, and all user-facing input fields.
-/// Both ping streaming and DNS fetching are coordinated through this class.
+/// Owns UI state, validates inputs, debounces async actions, and translates
+/// typed service results into terminal-friendly lines.
 class NetworkController extends ChangeNotifier {
   NetworkController({
     required PingService pingService,
     required DnsService dnsService,
-  })  : _pingService = pingService,
-        _dnsService = dnsService;
+  }) : _pingService = pingService,
+       _dnsService = dnsService;
 
   final PingService _pingService;
   final DnsService _dnsService;
 
-  // -------------------------------------------------------------------------
-  // Ping state
-  // -------------------------------------------------------------------------
+  bool _isDisposed = false;
+
+  NetworkToolMode activeMode = NetworkToolMode.ping;
 
   /// Host or IP address entered by the user.
   String pingHost = '';
@@ -38,14 +39,10 @@ class NetworkController extends ChangeNotifier {
   /// Optional error message to display in the ping panel.
   String? pingError;
 
-  // -------------------------------------------------------------------------
-  // DNS state
-  // -------------------------------------------------------------------------
-
   /// Domain entered by the user.
   String dnsDomain = '';
 
-  /// Currently selected record type.
+  /// Currently selected DNS record type.
   DnsRecordType dnsRecordType = DnsRecordType.a;
 
   /// Whether a DNS lookup is currently in flight.
@@ -57,73 +54,215 @@ class NetworkController extends ChangeNotifier {
   /// Optional error message to display in the DNS panel.
   String? dnsError;
 
-  // -------------------------------------------------------------------------
-  // Ping actions
-  // -------------------------------------------------------------------------
+  bool get isBusy => isPinging || isDnsLoading;
+
+  List<String> get activeOutputLines {
+    return switch (activeMode) {
+      NetworkToolMode.ping => _pingLines,
+      NetworkToolMode.dns => _dnsLines,
+    };
+  }
+
+  String get activeOutputText => activeOutputLines.join('\n');
+
+  List<String> get _pingLines {
+    final lines = <String>[...pingOutput.expand((line) => line.split('\n'))];
+    if (pingError != null) {
+      lines.add('Error: $pingError');
+    }
+    return lines;
+  }
+
+  List<String> get _dnsLines {
+    if (dnsError != null) {
+      return ['Error: $dnsError'];
+    }
+    if (dnsResults.isEmpty) {
+      return const [];
+    }
+    return [
+      'DNS results:',
+      '',
+      for (final record in dnsResults) record.formatted,
+    ];
+  }
+
+  void setActiveMode(NetworkToolMode mode) {
+    if (activeMode == mode) return;
+    activeMode = mode;
+    _notify();
+  }
+
+  void setPingHost(String value) {
+    pingHost = value;
+  }
+
+  void setPingCount(int value) {
+    pingCount = value.clamp(1, 20);
+    _notify();
+  }
+
+  void setDnsDomain(String value) {
+    dnsDomain = value;
+  }
+
+  void setDnsRecordType(DnsRecordType value) {
+    if (dnsRecordType == value) return;
+    dnsRecordType = value;
+    _notify();
+  }
 
   /// Start streaming ping packets to [pingHost].
   Future<void> startPing() async {
-    if (isPinging || pingHost.trim().isEmpty) return;
+    final host = pingHost.trim();
+    if (isPinging) return;
 
     pingOutput.clear();
     pingError = null;
+
+    if (host.isEmpty) {
+      pingError = 'Ping failed. Please check the host.';
+      _notify();
+      return;
+    }
+
     isPinging = true;
-    notifyListeners();
+    pingOutput
+      ..add('Pinging $host...')
+      ..add('');
+    _notify();
 
     try {
-      await _pingService.ping(
-        host: pingHost.trim(),
+      await for (final event in _pingService.ping(
+        host: host,
         count: pingCount,
-        onResult: (line) {
-          pingOutput.add(line);
-          notifyListeners();
-        },
-      );
-    } catch (e) {
+      )) {
+        pingOutput.addAll(_formatPingEvent(event, host));
+        _notify();
+      }
+    } catch (_) {
       pingError = 'Ping failed. Please check the host.';
     } finally {
+      _pingService.stopPing();
       isPinging = false;
-      notifyListeners();
+      _notify();
     }
   }
 
   /// Abort an active ping stream.
   void stopPing() {
-    _pingService.cancel();
-    isPinging = false;
-    pingOutput.add('--- Ping cancelled by user ---');
-    notifyListeners();
-  }
+    if (!isPinging) return;
 
-  // -------------------------------------------------------------------------
-  // DNS actions
-  // -------------------------------------------------------------------------
+    _pingService.stopPing();
+    isPinging = false;
+    pingOutput.add('--- Ping stopped by user ---');
+    _notify();
+  }
 
   /// Execute a DNS lookup for [dnsDomain] using [dnsRecordType].
   Future<void> lookupDns() async {
-    if (isDnsLoading || dnsDomain.trim().isEmpty) return;
+    final domain = dnsDomain.trim();
+    if (isDnsLoading) return;
 
     dnsResults = [];
     dnsError = null;
+
+    if (domain.isEmpty) {
+      dnsError = 'DNS lookup failed. Please check the domain.';
+      _notify();
+      return;
+    }
+
     isDnsLoading = true;
-    notifyListeners();
+    _notify();
 
     try {
       dnsResults = await _dnsService.lookup(
-        domain: dnsDomain.trim(),
+        domain: domain,
         type: dnsRecordType,
       );
-    } catch (e) {
-      dnsError = e.toString();
+    } on DnsServiceException catch (e) {
+      dnsError = e.message;
+    } catch (_) {
+      dnsError = 'DNS lookup failed. Please check the domain.';
     } finally {
       isDnsLoading = false;
+      _notify();
+    }
+  }
+
+  List<String> _formatPingEvent(PingEvent event, String host) {
+    return switch (event) {
+      PingResponse() => [
+        'Reply from ${event.ip ?? host}: '
+            '${event.seq == null ? '' : 'seq=${event.seq} '}'
+            'ttl=${event.ttl ?? '?'} '
+            'time=${_formatDurationMs(event.time)} ms',
+      ],
+      PingError() => [
+        'Error${event.seq == null ? '' : ' seq=${event.seq}'}: '
+            '${event.message ?? _describeError(event.error)}'
+            '${event.ip == null ? '' : ' (${event.ip})'}',
+      ],
+      PingSummary() => _formatSummary(event),
+    };
+  }
+
+  List<String> _formatSummary(PingSummary summary) {
+    final lost = summary.transmitted - summary.received;
+    final lines = [
+      '',
+      'Summary:',
+      'Sent: ${summary.transmitted}',
+      'Received: ${summary.received}',
+      'Lost: $lost',
+      'Packet loss: ${summary.packetLoss.toStringAsFixed(0)}%',
+    ];
+
+    final stats = summary.stats;
+    if (stats?.avg != null) {
+      lines.add('Average: ${_formatDurationMs(stats!.avg)} ms');
+    }
+    if (stats?.min != null && stats?.max != null) {
+      lines.add(
+        'Min/Max: ${_formatDurationMs(stats!.min)} / '
+        '${_formatDurationMs(stats.max)} ms',
+      );
+    }
+    return lines;
+  }
+
+  String _formatDurationMs(Duration? duration) {
+    if (duration == null) return '?';
+    final micros = duration.inMicroseconds;
+    if (micros % Duration.microsecondsPerMillisecond == 0) {
+      return (micros ~/ Duration.microsecondsPerMillisecond).toString();
+    }
+    return (micros / Duration.microsecondsPerMillisecond).toStringAsFixed(1);
+  }
+
+  String _describeError(ErrorType error) {
+    return switch (error) {
+      ErrorType.requestTimedOut => 'Request timed out.',
+      ErrorType.unknownHost => 'Unknown host.',
+      ErrorType.timeToLiveExceeded => 'Time to live exceeded.',
+      ErrorType.noReply => 'No reply.',
+      ErrorType.noRoute => 'No route to host.',
+      ErrorType.unknown => 'Unknown error.',
+    };
+  }
+
+  void _notify() {
+    if (!_isDisposed) {
       notifyListeners();
     }
   }
 
   @override
   void dispose() {
-    _pingService.cancel();
+    _isDisposed = true;
+    _pingService.stopPing();
+    _dnsService.close();
     super.dispose();
   }
 }

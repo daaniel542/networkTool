@@ -74,7 +74,7 @@ You are an expert Flutter & Dart engineer. Your task is to build the "Net Utilit
 - [x] Write `lib/features/converter/converter_controller.dart`:
   - Extend `ChangeNotifier`.
   - Enforce a 50,000 character limit on the input.
-- [ ] Write `lib/features/converter/converter_screen.dart`:
+- [x] Write `lib/features/converter/converter_screen.dart`:
   - Include an input `TextField`, a dropdown for the operation, a Convert button, and an `OutputBox`.
 - [x] Write `test/converter_service_test.dart`: Unit tests for hashing and encode/decode operations.
 
@@ -84,18 +84,18 @@ You are an expert Flutter & Dart engineer. Your task is to build the "Net Utilit
 
 **Goal:** Build the platform-specific network tools.
 
-- [ ] Write `lib/features/network/ping_service.dart`:
+- [x] Write `lib/features/network/ping_service.dart`:
   - Wrap `dart_ping` to stream `PingData`.
   - Provide a `stopPing()` method.
-- [ ] Write `lib/features/network/dns_service.dart`:
+- [x] Write `lib/features/network/dns_service.dart`:
   - Make a `GET` request to `https://cloudflare-dns.com/dns-query?name={domain}&type={type}`.
   - Include `Accept: application/dns-json` headers.
   - Parse the JSON and return formatted records (or handle HTTP 429 Rate Limiting explicitly).
-- [ ] Write `lib/features/network/network_controller.dart`:
+- [x] Write `lib/features/network/network_controller.dart`:
   - Extend `ChangeNotifier`.
   - Manage state for DNS Lookup vs Ping toggles, live stream logs, and loading/debouncing states.
-- [ ] Write `lib/shared/widgets/terminal_output.dart`: A black-background, monospaced text scrolling list for ping results.
-- [ ] Write `lib/features/network/network_screen.dart`:
+- [x] Write `lib/shared/widgets/terminal_output.dart`: A black-background, monospaced text scrolling list for ping results.
+- [x] Write `lib/features/network/network_screen.dart`:
   - The UI for inputting a host/domain, triggering the correct service, and displaying the terminal.
 
 ---
