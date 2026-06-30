@@ -54,6 +54,9 @@ class NetworkController extends ChangeNotifier {
   /// Optional error message to display in the DNS panel.
   String? dnsError;
 
+  /// Whether the user has completed at least one DNS lookup in this session.
+  bool hasDnsLookupResult = false;
+
   bool get isBusy => isPinging || isDnsLoading;
 
   List<String> get activeOutputLines {
@@ -78,13 +81,32 @@ class NetworkController extends ChangeNotifier {
       return ['Error: $dnsError'];
     }
     if (dnsResults.isEmpty) {
-      return const [];
+      if (!hasDnsLookupResult) {
+        return const [];
+      }
+      return [
+        'DNS Lookup',
+        'Domain : ${dnsDomain.trim()}',
+        'Type   : ${dnsRecordType.queryValue}',
+        'Status : No records found',
+        '',
+        'No ${dnsRecordType.queryValue} records found for ${dnsDomain.trim()}.',
+      ];
     }
-    return [
-      'DNS results:',
-      '',
-      for (final record in dnsResults) record.formatted,
+
+    final lines = [
+      'DNS Lookup',
+      'Domain : ${dnsDomain.trim()}',
+      'Type   : ${dnsRecordType.queryValue}',
+      'Records: ${dnsResults.length}',
     ];
+
+    for (var i = 0; i < dnsResults.length; i += 1) {
+      lines.add('');
+      lines.addAll(_formatDnsRecord(i + 1, dnsResults[i]));
+    }
+
+    return lines;
   }
 
   void setActiveMode(NetworkToolMode mode) {
@@ -166,9 +188,11 @@ class NetworkController extends ChangeNotifier {
 
     dnsResults = [];
     dnsError = null;
+    hasDnsLookupResult = false;
 
     if (domain.isEmpty) {
       dnsError = 'DNS lookup failed. Please check the domain.';
+      hasDnsLookupResult = true;
       _notify();
       return;
     }
@@ -186,6 +210,7 @@ class NetworkController extends ChangeNotifier {
     } catch (_) {
       dnsError = 'DNS lookup failed. Please check the domain.';
     } finally {
+      hasDnsLookupResult = true;
       isDnsLoading = false;
       _notify();
     }
@@ -228,6 +253,69 @@ class NetworkController extends ChangeNotifier {
         'Min/Max: ${_formatDurationMs(stats!.min)} / '
         '${_formatDurationMs(stats.max)} ms',
       );
+    }
+    return lines;
+  }
+
+  List<String> _formatDnsRecord(int index, DnsRecord record) {
+    final lines = ['[$index] ${record.type}', '    TTL  : ${record.ttl}'];
+
+    final txtParts = record.type == 'TXT'
+        ? _splitTxtRecord(record.value)
+        : null;
+    if (txtParts == null) {
+      lines.addAll(_formatWrappedField('Value', record.value));
+      return lines;
+    }
+
+    lines.add('    Key  : ${txtParts.key}');
+    lines.addAll(_formatWrappedField('Value', txtParts.value));
+    return lines;
+  }
+
+  ({String key, String value})? _splitTxtRecord(String rawValue) {
+    final value = _stripOuterQuotes(rawValue);
+    final separatorIndex = value.indexOf('=');
+    if (separatorIndex <= 0 || separatorIndex == value.length - 1) {
+      return null;
+    }
+
+    return (
+      key: value.substring(0, separatorIndex),
+      value: value.substring(separatorIndex + 1),
+    );
+  }
+
+  String _stripOuterQuotes(String value) {
+    if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+      return value.substring(1, value.length - 1);
+    }
+    return value;
+  }
+
+  List<String> _formatWrappedField(String label, String value) {
+    const valueWidth = 72;
+    final valueLines = _wrapText(_stripOuterQuotes(value), valueWidth);
+    return [
+      '    ${label.padRight(5)}: ${valueLines.first}',
+      for (final line in valueLines.skip(1)) '           $line',
+    ];
+  }
+
+  List<String> _wrapText(String value, int width) {
+    if (value.length <= width) return [value];
+
+    final lines = <String>[];
+    var remaining = value;
+    while (remaining.length > width) {
+      var splitAt = remaining.lastIndexOf(' ', width);
+      if (splitAt <= 0) splitAt = width;
+
+      lines.add(remaining.substring(0, splitAt).trimRight());
+      remaining = remaining.substring(splitAt).trimLeft();
+    }
+    if (remaining.isNotEmpty) {
+      lines.add(remaining);
     }
     return lines;
   }
