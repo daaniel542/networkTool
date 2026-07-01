@@ -153,7 +153,7 @@ class _PasswordSettingsCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           const _Caption(
-            'Avoid confusing characters like lowercase l, uppercase I, O, and zero.',
+            'Exclude any character from the password.',
           ),
           const SizedBox(height: 28),
           _PrimaryButton(
