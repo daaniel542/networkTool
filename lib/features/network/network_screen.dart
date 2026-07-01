@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../shared/utils/clipboard_helper.dart';
+import '../../shared/widgets/terminal_output.dart';
 import 'dns_service.dart';
 import 'network_controller.dart';
-import 'ping_service.dart';
 
 const _background = Color(0xFFF8FAFC);
 const _surface = Colors.white;
@@ -15,11 +16,6 @@ const _border = Color(0xFFE2E8F0);
 const _controlBorder = Color(0xFFCBD5E1);
 const _successBg = Color(0xFFDCFCE7);
 const _successText = Color(0xFF166534);
-const _terminal = Color(0xFF020617);
-const _terminalMuted = Color(0xFF94A3B8);
-const _terminalText = Color(0xFFE2E8F0);
-
-enum _NetworkMode { ping, dns }
 
 class NetworkScreen extends StatefulWidget {
   const NetworkScreen({super.key});
@@ -29,34 +25,37 @@ class NetworkScreen extends StatefulWidget {
 }
 
 class _NetworkScreenState extends State<NetworkScreen> {
-  late final NetworkController _controller;
-  late final TextEditingController _pingHostController;
-  late final TextEditingController _dnsDomainController;
-  _NetworkMode _mode = _NetworkMode.ping;
+  final TextEditingController _pingHostController = TextEditingController();
+  final TextEditingController _dnsDomainController = TextEditingController();
+  final TextEditingController _traceHostController = TextEditingController();
+  NetworkController? _controller;
 
   @override
-  void initState() {
-    super.initState();
-    _controller = NetworkController(
-      pingService: PingService(),
-      dnsService: DnsService(),
-    );
-    _pingHostController = TextEditingController(text: _controller.pingHost);
-    _dnsDomainController = TextEditingController(text: _controller.dnsDomain);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final controller = context.read<NetworkController>();
+    if (_controller == controller) return;
+
+    _controller = controller;
+    _pingHostController.text = controller.pingHost;
+    _dnsDomainController.text = controller.dnsDomain;
+    _traceHostController.text = controller.traceHost;
   }
 
   @override
   void dispose() {
-    _controller.dispose();
     _pingHostController.dispose();
     _dnsDomainController.dispose();
+    _traceHostController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final controller = context.watch<NetworkController>();
+
     return AnimatedBuilder(
-      animation: _controller,
+      animation: controller,
       builder: (context, _) {
         return _ToolPage(
           title: 'Network Tools',
@@ -66,13 +65,12 @@ class _NetworkScreenState extends State<NetworkScreen> {
             builder: (context, constraints) {
               final isWide = constraints.maxWidth >= 900;
               final controls = _ControlsCard(
-                controller: _controller,
-                mode: _mode,
+                controller: controller,
                 pingHostController: _pingHostController,
                 dnsDomainController: _dnsDomainController,
-                onModeChanged: (mode) => setState(() => _mode = mode),
+                traceHostController: _traceHostController,
               );
-              final output = _OutputCard(mode: _mode, controller: _controller);
+              final output = _OutputCard(controller: controller);
 
               if (!isWide) {
                 return Column(
@@ -99,22 +97,26 @@ class _NetworkScreenState extends State<NetworkScreen> {
 class _ControlsCard extends StatelessWidget {
   const _ControlsCard({
     required this.controller,
-    required this.mode,
     required this.pingHostController,
     required this.dnsDomainController,
-    required this.onModeChanged,
+    required this.traceHostController,
   });
 
   final NetworkController controller;
-  final _NetworkMode mode;
   final TextEditingController pingHostController;
   final TextEditingController dnsDomainController;
-  final ValueChanged<_NetworkMode> onModeChanged;
+  final TextEditingController traceHostController;
 
   @override
   Widget build(BuildContext context) {
-    final isPing = mode == _NetworkMode.ping;
-    final textController = isPing ? pingHostController : dnsDomainController;
+    final isPing = controller.activeMode == NetworkToolMode.ping;
+    final isDns = controller.activeMode == NetworkToolMode.dns;
+    final isTrace = controller.activeMode == NetworkToolMode.trace;
+    final textController = isPing
+        ? pingHostController
+        : isDns
+        ? dnsDomainController
+        : traceHostController;
 
     return _Card(
       minHeight: 520,
@@ -125,19 +127,24 @@ class _ControlsCard extends StatelessWidget {
           const SizedBox(height: 6),
           const _BodyText('Check host reachability and resolve DNS records.'),
           const SizedBox(height: 28),
-          _SegmentedControl(mode: mode, onChanged: onModeChanged),
+          _SegmentedControl(
+            mode: controller.activeMode,
+            onChanged: controller.setActiveMode,
+          ),
           const SizedBox(height: 30),
-          _FieldLabel(isPing ? 'Host or IP Address' : 'Domain Name'),
+          _FieldLabel(isDns ? 'Domain Name' : 'Host or IP Address'),
           const SizedBox(height: 8),
           _TextInput(
             controller: textController,
             hintText: 'google.com',
-            enabled: !controller.isPinging && !controller.isDnsLoading,
+            enabled: !controller.isBusy,
             onChanged: (value) {
               if (isPing) {
-                controller.pingHost = value;
+                controller.setPingHost(value);
+              } else if (isDns) {
+                controller.setDnsDomain(value);
               } else {
-                controller.dnsDomain = value;
+                controller.setTraceHost(value);
               }
             },
           ),
@@ -153,7 +160,7 @@ class _ControlsCard extends StatelessWidget {
               enabled: !controller.isPinging,
               onChanged: (value) {
                 if (value != null) {
-                  controller.pingCount = value;
+                  controller.setPingCount(value);
                 }
               },
             ),
@@ -169,7 +176,7 @@ class _ControlsCard extends StatelessWidget {
                   onPressed: controller.isPinging
                       ? null
                       : () {
-                          controller.pingHost = pingHostController.text;
+                          controller.setPingHost(pingHostController.text);
                           controller.startPing();
                         },
                 ),
@@ -180,7 +187,7 @@ class _ControlsCard extends StatelessWidget {
                 ),
               ],
             ),
-          ] else ...[
+          ] else if (isDns) ...[
             const _FieldLabel('Record Type'),
             const SizedBox(height: 8),
             _Dropdown<DnsRecordType>(
@@ -191,7 +198,7 @@ class _ControlsCard extends StatelessWidget {
               enabled: !controller.isDnsLoading,
               onChanged: (value) {
                 if (value != null) {
-                  controller.dnsRecordType = value;
+                  controller.setDnsRecordType(value);
                 }
               },
             ),
@@ -203,14 +210,43 @@ class _ControlsCard extends StatelessWidget {
               onPressed: controller.isDnsLoading
                   ? null
                   : () {
-                      controller.dnsDomain = dnsDomainController.text;
+                      controller.setDnsDomain(dnsDomainController.text);
                       controller.lookupDns();
                     },
+            ),
+          ] else if (isTrace) ...[
+            const _BodyText(
+              'Trace the route by probing each hop with increasing TTL values.',
+            ),
+            const SizedBox(height: 36),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                _PrimaryButton(
+                  label: controller.isTracing ? 'Tracing...' : 'Start Trace',
+                  width: 160,
+                  isLoading: controller.isTracing,
+                  onPressed: controller.isTracing
+                      ? null
+                      : () {
+                          controller.setTraceHost(traceHostController.text);
+                          controller.startTraceroute(traceHostController.text);
+                        },
+                ),
+                _SecondaryButton(
+                  label: 'Stop',
+                  width: 112,
+                  onPressed: controller.isTracing
+                      ? () => controller.stopTraceroute()
+                      : null,
+                ),
+              ],
             ),
           ],
           const SizedBox(height: 40),
           const _Caption(
-            'Ping support is the v1 network diagnostic priority. DNS uses Cloudflare DNS-over-HTTPS.',
+            'Ping and Trace use local ICMP probes. DNS uses Cloudflare DNS-over-HTTPS.',
           ),
         ],
       ),
@@ -219,17 +255,14 @@ class _ControlsCard extends StatelessWidget {
 }
 
 class _OutputCard extends StatelessWidget {
-  const _OutputCard({required this.mode, required this.controller});
+  const _OutputCard({required this.controller});
 
-  final _NetworkMode mode;
   final NetworkController controller;
 
   @override
   Widget build(BuildContext context) {
-    final lines = mode == _NetworkMode.ping
-        ? _pingLines(controller)
-        : _dnsLines(controller);
-    final outputText = lines.join('\n');
+    final lines = controller.activeOutputLines;
+    final outputText = controller.activeOutputText;
 
     return _Card(
       minHeight: 520,
@@ -240,7 +273,7 @@ class _OutputCard extends StatelessWidget {
           const SizedBox(height: 6),
           const _BodyText('Live results stream into a copy-friendly terminal.'),
           const SizedBox(height: 28),
-          _Terminal(lines: lines),
+          TerminalOutput(lines: lines, minHeight: 342),
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerRight,
@@ -255,32 +288,6 @@ class _OutputCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  List<String> _pingLines(NetworkController controller) {
-    final lines = <String>[];
-    if (controller.pingOutput.isNotEmpty) {
-      lines.addAll(controller.pingOutput.expand((line) => line.split('\n')));
-    }
-    if (controller.pingError != null) {
-      lines.add('Error: ${controller.pingError}');
-    }
-    return lines;
-  }
-
-  List<String> _dnsLines(NetworkController controller) {
-    if (controller.dnsError != null) {
-      return ['Error: ${controller.dnsError}'];
-    }
-    if (controller.dnsResults.isEmpty) {
-      return [];
-    }
-    return [
-      'DNS results:',
-      '',
-      for (final record in controller.dnsResults)
-        '${record.type.padRight(6)} ${record.value}  TTL ${record.ttl}',
-    ];
   }
 }
 
@@ -385,8 +392,8 @@ class _Card extends StatelessWidget {
 class _SegmentedControl extends StatelessWidget {
   const _SegmentedControl({required this.mode, required this.onChanged});
 
-  final _NetworkMode mode;
-  final ValueChanged<_NetworkMode> onChanged;
+  final NetworkToolMode mode;
+  final ValueChanged<NetworkToolMode> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -401,13 +408,18 @@ class _SegmentedControl extends StatelessWidget {
         children: [
           _SegmentButton(
             label: 'Ping',
-            selected: mode == _NetworkMode.ping,
-            onTap: () => onChanged(_NetworkMode.ping),
+            selected: mode == NetworkToolMode.ping,
+            onTap: () => onChanged(NetworkToolMode.ping),
           ),
           _SegmentButton(
-            label: 'DNS Lookup',
-            selected: mode == _NetworkMode.dns,
-            onTap: () => onChanged(_NetworkMode.dns),
+            label: 'DNS',
+            selected: mode == NetworkToolMode.dns,
+            onTap: () => onChanged(NetworkToolMode.dns),
+          ),
+          _SegmentButton(
+            label: 'Trace',
+            selected: mode == NetworkToolMode.trace,
+            onTap: () => onChanged(NetworkToolMode.trace),
           ),
         ],
       ),
@@ -449,56 +461,6 @@ class _SegmentButton extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _Terminal extends StatelessWidget {
-  const _Terminal({required this.lines});
-
-  final List<String> lines;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 342,
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      decoration: BoxDecoration(
-        color: _terminal,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Live Output',
-            style: TextStyle(
-              color: _terminalMuted,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: SingleChildScrollView(
-              child: SelectableText(
-                lines.isEmpty
-                    ? 'No results yet. Enter input and run the tool.'
-                    : lines.join('\n'),
-                style: TextStyle(
-                  color: lines.isEmpty ? _terminalMuted : _terminalText,
-                  fontFamily: 'monospace',
-                  fontSize: 13,
-                  height: 1.45,
-                  letterSpacing: 0,
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
