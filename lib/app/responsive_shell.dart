@@ -238,23 +238,16 @@ class _SidebarFooter extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Image.asset(
-          'assets/images/elephantlogo.png',
-          width: 186,
-          fit: BoxFit.contain,
-          semanticLabel: 'Elephant Technology Limited logo',
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'Elephant Technology Ltd',
-          style: TextStyle(
-            color: Color(0xFF64748B),
-            fontSize: 12,
-            fontWeight: FontWeight.w400,
-            letterSpacing: 0,
+        Transform.translate(
+          offset: const Offset(-10, 0),
+          child: Image.asset(
+            'assets/images/elephantlogo.png',
+            width: 186,
+            fit: BoxFit.contain,
+            semanticLabel: 'Elephant Technology Limited logo',
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 10),
         const Text(
           'Version 1',
           style: TextStyle(
