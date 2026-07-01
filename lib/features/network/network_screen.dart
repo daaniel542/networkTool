@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../shared/utils/clipboard_helper.dart';
@@ -150,17 +151,10 @@ class _ControlsCard extends StatelessWidget {
           if (isPing) ...[
             const _FieldLabel('Ping Count'),
             const SizedBox(height: 8),
-            _Dropdown<int>(
-              width: 160,
+            _PingCountInput(
               value: controller.pingCount,
-              values: const [4, 5, 10, 20],
-              labelFor: (value) => value.toString(),
               enabled: !controller.isPinging,
-              onChanged: (value) {
-                if (value != null) {
-                  controller.setPingCount(value);
-                }
-              },
+              onChanged: controller.setPingCount,
             ),
             const SizedBox(height: 36),
             Wrap(
@@ -188,17 +182,10 @@ class _ControlsCard extends StatelessWidget {
           ] else if (isDns) ...[
             const _FieldLabel('Record Type'),
             const SizedBox(height: 8),
-            _Dropdown<DnsRecordType>(
-              width: 180,
+            _DnsRecordDropdown(
               value: controller.dnsRecordType,
-              values: DnsRecordType.values,
-              labelFor: (value) => value.name.toUpperCase(),
               enabled: !controller.isDnsLoading,
-              onChanged: (value) {
-                if (value != null) {
-                  controller.setDnsRecordType(value);
-                }
-              },
+              onChanged: controller.setDnsRecordType,
             ),
             const SizedBox(height: 36),
             _PrimaryButton(
@@ -609,63 +596,268 @@ class _TextInput extends StatelessWidget {
   }
 }
 
-class _Dropdown<T> extends StatefulWidget {
-  const _Dropdown({
-    required this.width,
+class _PingCountInput extends StatefulWidget {
+  const _PingCountInput({
     required this.value,
-    required this.values,
-    required this.labelFor,
     required this.enabled,
     required this.onChanged,
   });
 
-  final double width;
-  final T value;
-  final List<T> values;
-  final String Function(T value) labelFor;
+  final int value;
   final bool enabled;
-  final ValueChanged<T?> onChanged;
+  final ValueChanged<int> onChanged;
 
   @override
-  State<_Dropdown<T>> createState() => _DropdownState<T>();
+  State<_PingCountInput> createState() => _PingCountInputState();
 }
 
-class _DropdownState<T> extends State<_Dropdown<T>> {
-  late T _value = widget.value;
+class _PingCountInputState extends State<_PingCountInput> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
 
   @override
-  void didUpdateWidget(covariant _Dropdown<T> oldWidget) {
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.value.toString());
+    _focusNode = FocusNode()..addListener(_handleFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(covariant _PingCountInput oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _value = widget.value;
+    if (widget.value != oldWidget.value && !_focusNode.hasFocus) {
+      _setText(widget.value.toString());
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode
+      ..removeListener(_handleFocusChange)
+      ..dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    if (!_focusNode.hasFocus) {
+      _commit();
+    }
+  }
+
+  void _step(int delta) {
+    if (!widget.enabled) return;
+    final next = (widget.value + delta).clamp(1, 20);
+    widget.onChanged(next);
+    _setText(next.toString());
+  }
+
+  void _handleChanged(String rawValue) {
+    final value = int.tryParse(rawValue);
+    if (value == null) return;
+    widget.onChanged(value.clamp(1, 20));
+  }
+
+  void _commit() {
+    final value = int.tryParse(_controller.text);
+    final normalized = (value ?? widget.value).clamp(1, 20);
+    widget.onChanged(normalized);
+    _setText(normalized.toString());
+  }
+
+  void _setText(String value) {
+    _controller.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: widget.width,
+      width: 180,
       height: 46,
-      child: DropdownButtonFormField<T>(
-        initialValue: _value,
-        items: widget.values
-            .map(
-              (value) => DropdownMenuItem<T>(
-                value: value,
-                child: Text(widget.labelFor(value)),
+      child: Row(
+        children: [
+          _StepButton(
+            icon: Icons.remove,
+            enabled: widget.enabled && widget.value > 1,
+            onPressed: () => _step(-1),
+          ),
+          SizedBox(
+            width: 68,
+            height: 46,
+            child: TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              enabled: widget.enabled,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              cursorColor: _primary,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(2),
+              ],
+              onChanged: _handleChanged,
+              onEditingComplete: _commit,
+              style: const TextStyle(
+                color: _text,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0,
               ),
-            )
-            .toList(),
-        onChanged: widget.enabled
-            ? (value) {
-                if (value != null) {
-                  setState(() => _value = value);
-                }
-                widget.onChanged(value);
-              }
-            : null,
-        icon: const Icon(Icons.keyboard_arrow_down, color: _muted, size: 18),
-        dropdownColor: _surface,
-        style: const TextStyle(color: _text, fontSize: 14, letterSpacing: 0),
-        decoration: _inputDecoration(),
+              decoration: _inputDecoration().copyWith(
+                contentPadding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+            ),
+          ),
+          _StepButton(
+            icon: Icons.add,
+            enabled: widget.enabled && widget.value < 20,
+            onPressed: () => _step(1),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  const _StepButton({
+    required this.icon,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 42,
+      height: 46,
+      child: OutlinedButton(
+        onPressed: enabled ? onPressed : null,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          foregroundColor: _label,
+          disabledForegroundColor: _muted.withValues(alpha: 0.45),
+          side: BorderSide(
+            color: enabled
+                ? _controlBorder
+                : _controlBorder.withValues(alpha: 0.55),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        child: Icon(icon, size: 18),
+      ),
+    );
+  }
+}
+
+class _DnsRecordDropdown extends StatelessWidget {
+  const _DnsRecordDropdown({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final DnsRecordType value;
+  final bool enabled;
+  final ValueChanged<DnsRecordType> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        inputDecorationTheme: const InputDecorationTheme(
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
+        ),
+      ),
+      child: DropdownMenu<DnsRecordType>(
+        initialSelection: value,
+        enabled: enabled,
+        width: 180,
+        menuHeight: 288,
+        requestFocusOnTap: false,
+        enableSearch: false,
+        textStyle: const TextStyle(
+          color: _text,
+          fontSize: 14,
+          letterSpacing: 0,
+        ),
+        trailingIcon: const Icon(
+          Icons.keyboard_arrow_down,
+          color: _muted,
+          size: 18,
+        ),
+        selectedTrailingIcon: const Icon(
+          Icons.keyboard_arrow_up,
+          color: _muted,
+          size: 18,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: _surface,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 14,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: _controlBorder),
+          ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(
+              color: _controlBorder.withValues(alpha: 0.55),
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: _primary),
+          ),
+        ),
+        menuStyle: MenuStyle(
+          backgroundColor: const WidgetStatePropertyAll(_surface),
+          elevation: const WidgetStatePropertyAll(4),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: const BorderSide(color: _border),
+            ),
+          ),
+        ),
+        dropdownMenuEntries: [
+          for (final recordType in DnsRecordType.values)
+            DropdownMenuEntry<DnsRecordType>(
+              value: recordType,
+              label: recordType.name.toUpperCase(),
+              style: ButtonStyle(
+                foregroundColor: const WidgetStatePropertyAll(_text),
+                textStyle: const WidgetStatePropertyAll(
+                  TextStyle(fontSize: 14, letterSpacing: 0),
+                ),
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 14),
+                ),
+              ),
+            ),
+        ],
+        onSelected: (recordType) {
+          if (recordType != null) {
+            onChanged(recordType);
+          }
+        },
       ),
     );
   }

@@ -344,49 +344,93 @@ class _OutputArea extends StatelessWidget {
   }
 }
 
-class _OperationDropdown extends StatefulWidget {
+class _OperationDropdown extends StatelessWidget {
   const _OperationDropdown({required this.value, required this.onChanged});
 
   final ConverterOperation value;
   final ValueChanged<ConverterOperation> onChanged;
 
   @override
-  State<_OperationDropdown> createState() => _OperationDropdownState();
-}
-
-class _OperationDropdownState extends State<_OperationDropdown> {
-  late ConverterOperation _value = widget.value;
-
-  @override
-  void didUpdateWidget(covariant _OperationDropdown oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _value = widget.value;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 260,
-      height: 46,
-      child: DropdownButtonFormField<ConverterOperation>(
-        initialValue: _value,
-        items: ConverterOperation.values
-            .map(
-              (operation) => DropdownMenuItem<ConverterOperation>(
-                value: operation,
-                child: Text(_operationLabel(operation)),
+    return Theme(
+      data: Theme.of(context).copyWith(
+        inputDecorationTheme: const InputDecorationTheme(
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
+        ),
+      ),
+      child: DropdownMenu<ConverterOperation>(
+        initialSelection: value,
+        width: 260,
+        menuHeight: 304,
+        requestFocusOnTap: false,
+        enableSearch: false,
+        textStyle: const TextStyle(
+          color: _text,
+          fontSize: 14,
+          letterSpacing: 0,
+        ),
+        trailingIcon: const Icon(
+          Icons.keyboard_arrow_down,
+          color: _muted,
+          size: 18,
+        ),
+        selectedTrailingIcon: const Icon(
+          Icons.keyboard_arrow_up,
+          color: _muted,
+          size: 18,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: _surface,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 14,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: _controlBorder),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: _primary),
+          ),
+        ),
+        menuStyle: MenuStyle(
+          backgroundColor: const WidgetStatePropertyAll(_surface),
+          elevation: const WidgetStatePropertyAll(4),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: const BorderSide(color: _border),
+            ),
+          ),
+        ),
+        dropdownMenuEntries: [
+          for (final operation in ConverterOperation.values)
+            DropdownMenuEntry<ConverterOperation>(
+              value: operation,
+              label: _operationLabel(operation),
+              style: ButtonStyle(
+                foregroundColor: const WidgetStatePropertyAll(_text),
+                textStyle: const WidgetStatePropertyAll(
+                  TextStyle(fontSize: 14, letterSpacing: 0),
+                ),
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 14),
+                ),
               ),
-            )
-            .toList(),
-        onChanged: (operation) {
-          if (operation == null) return;
-          setState(() => _value = operation);
-          widget.onChanged(operation);
+            ),
+        ],
+        onSelected: (operation) {
+          if (operation != null) {
+            onChanged(operation);
+          }
         },
-        icon: const Icon(Icons.keyboard_arrow_down, color: _muted, size: 18),
-        dropdownColor: _surface,
-        style: const TextStyle(color: _text, fontSize: 14, letterSpacing: 0),
-        decoration: _inputDecoration(),
       ),
     );
   }
