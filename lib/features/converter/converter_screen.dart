@@ -371,38 +371,188 @@ class _OperationDropdown extends StatefulWidget {
 }
 
 class _OperationDropdownState extends State<_OperationDropdown> {
-  late ConverterOperation _value = widget.value;
+  bool _isOpen = false;
 
-  @override
-  void didUpdateWidget(covariant _OperationDropdown oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _value = widget.value;
+  void _select(ConverterOperation value) {
+    widget.onChanged(value);
+    setState(() => _isOpen = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return _InlineSelector<ConverterOperation>(
       width: 260,
-      height: 46,
-      child: DropdownButtonFormField<ConverterOperation>(
-        initialValue: _value,
-        items: ConverterOperation.values
-            .map(
-              (operation) => DropdownMenuItem<ConverterOperation>(
-                value: operation,
-                child: Text(_operationLabel(operation)),
+      panelWidth: 360,
+      label: _operationLabel(widget.value),
+      values: ConverterOperation.values,
+      selectedValue: widget.value,
+      isOpen: _isOpen,
+      labelFor: _operationLabel,
+      onToggle: () => setState(() => _isOpen = !_isOpen),
+      onSelected: _select,
+    );
+  }
+}
+
+class _InlineSelector<T> extends StatelessWidget {
+  const _InlineSelector({
+    required this.width,
+    required this.panelWidth,
+    required this.label,
+    required this.values,
+    required this.selectedValue,
+    required this.isOpen,
+    required this.labelFor,
+    required this.onToggle,
+    required this.onSelected,
+  });
+
+  final double width;
+  final double panelWidth;
+  final String label;
+  final List<T> values;
+  final T selectedValue;
+  final bool isOpen;
+  final String Function(T value) labelFor;
+  final VoidCallback onToggle;
+  final ValueChanged<T> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _InlineSelectorButton(
+          width: width,
+          label: label,
+          isOpen: isOpen,
+          onTap: onToggle,
+        ),
+        if (isOpen) ...[
+          const SizedBox(height: 8),
+          Container(
+            width: panelWidth,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _background,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _border),
+            ),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final value in values)
+                  _InlineOptionButton(
+                    label: labelFor(value),
+                    selected: value == selectedValue,
+                    onTap: () => onSelected(value),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _InlineSelectorButton extends StatelessWidget {
+  const _InlineSelectorButton({
+    required this.width,
+    required this.label,
+    required this.isOpen,
+    required this.onTap,
+  });
+
+  final double width;
+  final String label;
+  final bool isOpen;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: Container(
+        width: width,
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: _surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: isOpen ? _primary : _controlBorder),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _text,
+                  fontSize: 14,
+                  letterSpacing: 0,
+                ),
               ),
-            )
-            .toList(),
-        onChanged: (operation) {
-          if (operation == null) return;
-          setState(() => _value = operation);
-          widget.onChanged(operation);
-        },
-        icon: const Icon(Icons.keyboard_arrow_down, color: _muted, size: 18),
-        dropdownColor: _surface,
-        style: const TextStyle(color: _text, fontSize: 14, letterSpacing: 0),
-        decoration: _inputDecoration(),
+            ),
+            Icon(
+              isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+              color: _muted,
+              size: 18,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineOptionButton extends StatelessWidget {
+  const _InlineOptionButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Container(
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: selected ? _surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? _controlBorder : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? _primary : _label,
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                letterSpacing: 0,
+              ),
+            ),
+            if (selected) ...[
+              const SizedBox(width: 8),
+              const Icon(Icons.check, color: _primary, size: 15),
+            ],
+          ],
+        ),
       ),
     );
   }

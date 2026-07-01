@@ -178,8 +178,8 @@ class NetworkController extends ChangeNotifier {
 
     isPinging = true;
     pingOutput
-      ..add('Pinging $host...')
-      ..add('');
+      ..add('PING $host ($pingCount packets)')
+      ..add('────────────────────────────────────────');
     _notify();
 
     try {
@@ -322,42 +322,44 @@ class NetworkController extends ChangeNotifier {
   List<String> _formatPingEvent(PingEvent event, String host) {
     return switch (event) {
       PingResponse() => [
-        'Reply from ${event.ip ?? host}: '
-            '${event.seq == null ? '' : 'seq=${event.seq} '}'
-            'ttl=${event.ttl ?? '?'} '
-            'time=${_formatDurationMs(event.time)} ms',
+        '  ${_padSeq(event.seq)}  ${(event.ip ?? host).padRight(18)}  '
+            '${_formatDurationMs(event.time).padLeft(6)} ms   '
+            'ttl=${event.ttl ?? '?'}',
       ],
       PingError() => [
-        'Error${event.seq == null ? '' : ' seq=${event.seq}'}: '
-            '${event.message ?? _describeError(event.error)}'
-            '${event.ip == null ? '' : ' (${event.ip})'}',
+        '  ${_padSeq(event.seq)}  '
+            '${(event.message ?? _describeError(event.error)).padRight(18)}  '
+            '${event.ip == null ? '' : '(${event.ip})'}',
       ],
       PingSummary() => _formatSummary(event),
     };
   }
 
   List<String> _formatSummary(PingSummary summary) {
-    final lost = summary.transmitted - summary.received;
     final lines = [
       '',
-      'Summary:',
-      'Sent: ${summary.transmitted}',
-      'Received: ${summary.received}',
-      'Lost: $lost',
-      'Packet loss: ${summary.packetLoss.toStringAsFixed(0)}%',
+      '────────────────────────────────────────',
+      '  Packets : ${summary.transmitted} sent, '
+          '${summary.received} received, '
+          '${summary.packetLoss.toStringAsFixed(0)}% loss',
     ];
 
     final stats = summary.stats;
-    if (stats?.avg != null) {
-      lines.add('Average: ${_formatDurationMs(stats!.avg)} ms');
-    }
-    if (stats?.min != null && stats?.max != null) {
+    if (stats?.min != null && stats?.avg != null && stats?.max != null) {
       lines.add(
-        'Min/Max: ${_formatDurationMs(stats!.min)} / '
-        '${_formatDurationMs(stats.max)} ms',
+        '  Latency : ${_formatDurationMs(stats!.min)} min / '
+        '${_formatDurationMs(stats.avg)} avg / '
+        '${_formatDurationMs(stats.max)} max ms',
       );
+    } else if (stats?.avg != null) {
+      lines.add('  Latency : ${_formatDurationMs(stats!.avg)} ms avg');
     }
     return lines;
+  }
+
+  String _padSeq(int? seq) {
+    if (seq == null) return '  ';
+    return '#${(seq + 1).toString().padLeft(2)}';
   }
 
   List<String> _formatDnsRecord(int index, DnsRecord record) {

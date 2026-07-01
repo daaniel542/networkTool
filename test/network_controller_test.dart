@@ -30,13 +30,19 @@ void main() {
       await controller.startPing();
 
       expect(controller.isPinging, isFalse);
-      expect(controller.activeOutputLines, contains('Pinging google.com...'));
       expect(
         controller.activeOutputLines,
-        contains('Reply from 142.250.190.46: seq=1 ttl=57 time=24 ms'),
+        contains('PING google.com (4 packets)'),
       );
-      expect(controller.activeOutputLines, contains('Summary:'));
-      expect(controller.activeOutputLines, contains('Average: 24 ms'));
+      expect(
+        controller.activeOutputLines,
+        contains('  # 2  142.250.190.46          24 ms   ttl=57'),
+      );
+      expect(
+        controller.activeOutputLines,
+        contains('  Packets : 1 sent, 1 received, 0% loss'),
+      );
+      expect(controller.activeOutputLines, contains('  Latency : 24 ms avg'));
 
       controller.dispose();
     });
