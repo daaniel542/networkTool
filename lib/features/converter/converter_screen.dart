@@ -344,93 +344,171 @@ class _OutputArea extends StatelessWidget {
   }
 }
 
-class _OperationDropdown extends StatelessWidget {
+class _OperationDropdown extends StatefulWidget {
   const _OperationDropdown({required this.value, required this.onChanged});
 
   final ConverterOperation value;
   final ValueChanged<ConverterOperation> onChanged;
 
   @override
+  State<_OperationDropdown> createState() => _OperationDropdownState();
+}
+
+class _OperationDropdownState extends State<_OperationDropdown> {
+  bool _isOpen = false;
+
+  void _select(ConverterOperation operation) {
+    widget.onChanged(operation);
+    setState(() => _isOpen = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: Theme.of(context).copyWith(
-        inputDecorationTheme: const InputDecorationTheme(
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          isDense: true,
-          contentPadding: EdgeInsets.zero,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _DropdownButtonFrame(
+          width: 260,
+          label: _operationLabel(widget.value),
+          isOpen: _isOpen,
+          onTap: () => setState(() => _isOpen = !_isOpen),
+        ),
+        if (_isOpen) ...[
+          const SizedBox(height: 8),
+          _InlineOptionPanel(
+            width: 360,
+            children: [
+              for (final operation in ConverterOperation.values)
+                _InlineOptionButton(
+                  label: _operationLabel(operation),
+                  selected: operation == widget.value,
+                  onTap: () => _select(operation),
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _InlineOptionPanel extends StatelessWidget {
+  const _InlineOptionPanel({required this.width, required this.children});
+
+  final double width;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: _background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _border),
+      ),
+      child: Wrap(spacing: 8, runSpacing: 8, children: children),
+    );
+  }
+}
+
+class _InlineOptionButton extends StatelessWidget {
+  const _InlineOptionButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Container(
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: selected ? _surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? _controlBorder : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? _primary : _label,
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                letterSpacing: 0,
+              ),
+            ),
+            if (selected) ...[
+              const SizedBox(width: 8),
+              const Icon(Icons.check, color: _primary, size: 15),
+            ],
+          ],
         ),
       ),
-      child: DropdownMenu<ConverterOperation>(
-        initialSelection: value,
-        width: 260,
-        menuHeight: 304,
-        requestFocusOnTap: false,
-        enableSearch: false,
-        textStyle: const TextStyle(
-          color: _text,
-          fontSize: 14,
-          letterSpacing: 0,
+    );
+  }
+}
+
+class _DropdownButtonFrame extends StatelessWidget {
+  const _DropdownButtonFrame({
+    required this.width,
+    required this.label,
+    required this.isOpen,
+    required this.onTap,
+  });
+
+  final double width;
+  final String label;
+  final bool isOpen;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: Container(
+        width: width,
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: _surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: isOpen ? _primary : _controlBorder),
         ),
-        trailingIcon: const Icon(
-          Icons.keyboard_arrow_down,
-          color: _muted,
-          size: 18,
-        ),
-        selectedTrailingIcon: const Icon(
-          Icons.keyboard_arrow_up,
-          color: _muted,
-          size: 18,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: _surface,
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 14,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: _controlBorder),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: _primary),
-          ),
-        ),
-        menuStyle: MenuStyle(
-          backgroundColor: const WidgetStatePropertyAll(_surface),
-          elevation: const WidgetStatePropertyAll(4),
-          shape: WidgetStatePropertyAll(
-            RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: const BorderSide(color: _border),
-            ),
-          ),
-        ),
-        dropdownMenuEntries: [
-          for (final operation in ConverterOperation.values)
-            DropdownMenuEntry<ConverterOperation>(
-              value: operation,
-              label: _operationLabel(operation),
-              style: ButtonStyle(
-                foregroundColor: const WidgetStatePropertyAll(_text),
-                textStyle: const WidgetStatePropertyAll(
-                  TextStyle(fontSize: 14, letterSpacing: 0),
-                ),
-                padding: const WidgetStatePropertyAll(
-                  EdgeInsets.symmetric(horizontal: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: _text,
+                  fontSize: 14,
+                  letterSpacing: 0,
                 ),
               ),
             ),
-        ],
-        onSelected: (operation) {
-          if (operation != null) {
-            onChanged(operation);
-          }
-        },
+            Icon(
+              isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+              color: _muted,
+              size: 18,
+            ),
+          ],
+        ),
       ),
     );
   }
