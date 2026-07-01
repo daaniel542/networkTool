@@ -33,7 +33,7 @@ class NetUtilityApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'Network Utility Kit',
+        title: 'Elephant Network Tool',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(

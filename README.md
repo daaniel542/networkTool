@@ -1,23 +1,53 @@
-# networkTool
-Network tool for Elephant Technologies LTD
+# Elephant Network Tool
 
-## Vercel deployment
+Internal network utility for Elephant Technologies LTD.
 
-This Flutter app is configured for Vercel as a Flutter Web static build.
+The app is a Flutter desktop tool with Ping, Traceroute, DNS lookup, password
+generation, and encoding/hashing utilities. Native desktop builds are the
+recommended distribution path because Ping and Traceroute require local operating
+system networking capabilities that browser builds cannot provide.
 
-Vercel uses:
+## Development
 
-- Build command: `bash scripts/vercel-build.sh`
-- Output directory: `build/web`
-- SPA fallback: all routes rewrite to `/index.html`
+```sh
+flutter pub get
+flutter analyze
+flutter test
+```
 
-The build script installs Flutter stable on Vercel when `flutter` is not already
-available, enables web support, runs `flutter pub get`, and builds the release
-web bundle.
+Run locally on your current platform:
 
-### Web limitations
+```sh
+flutter run -d macos
+flutter run -d windows
+flutter run -d linux
+```
 
-Browsers cannot send ICMP packets or TTL-limited probes. On Vercel, DNS lookup,
-password generation, encoding, and hashing can run client-side, while Ping and
-Traceroute show browser-specific availability messages. To support hosted Ping
-or Traceroute, add a backend probe service and call it from the Flutter Web app.
+Only run the command for the OS you are currently using. Flutter does not
+cross-compile desktop apps from one operating system to another.
+
+## Release Builds
+
+Build the native release on each target OS:
+
+```sh
+flutter build macos --release
+flutter build windows --release
+flutter build linux --release
+```
+
+Release outputs:
+
+- macOS: `build/macos/Build/Products/Release/Elephant Network Tool.app`
+- Windows: `build/windows/x64/runner/Release/`
+- Linux: `build/linux/x64/release/bundle/`
+
+For internal distribution, package each release folder as a zip, label it with
+the app version and OS, and send the matching package to each IT member.
+
+## Web Limitations
+
+The Flutter Web target can still compile for browser-safe tools, but browsers
+cannot send ICMP packets or TTL-limited probes. DNS lookup, password generation,
+encoding, and hashing can run client-side on web. Ping and Traceroute need the
+native desktop app or a backend probe service.

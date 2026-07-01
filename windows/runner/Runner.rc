@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.netutility" "\0"
-            VALUE "FileDescription", "net_utility_toolkit" "\0"
+            VALUE "CompanyName", "Elephant Technologies LTD" "\0"
+            VALUE "FileDescription", "Elephant Network Tool" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "net_utility_toolkit" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.netutility. All rights reserved." "\0"
+            VALUE "InternalName", "Elephant Network Tool" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Elephant Technologies LTD. All rights reserved." "\0"
             VALUE "OriginalFilename", "net_utility_toolkit.exe" "\0"
-            VALUE "ProductName", "net_utility_toolkit" "\0"
+            VALUE "ProductName", "Elephant Network Tool" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

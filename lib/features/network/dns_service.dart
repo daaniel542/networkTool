@@ -2,7 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import 'network_controller.dart';
+/// Supported DNS record types for Cloudflare DNS-over-HTTPS lookups.
+enum DnsRecordType { a, aaaa, cname, mx, txt, ns }
 
 /// A single DNS answer record returned by the Cloudflare DoH API.
 class DnsRecord {
@@ -13,15 +14,6 @@ class DnsRecord {
   final int ttl;
 
   String get formatted => '$type  $value  TTL $ttl';
-}
-
-class DnsServiceException implements Exception {
-  const DnsServiceException(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
 }
 
 class DnsServiceException implements Exception {
@@ -48,11 +40,7 @@ class DnsService {
     required String domain,
     required DnsRecordType type,
   }) async {
-    // Strip accidental protocol schemas and trim whitespace.
-    final cleanDomain = domain
-        .replaceAll(RegExp(r'^https?://'), '')
-        .replaceAll(RegExp(r'^www\.'), '')
-        .trim();
+    final cleanDomain = _cleanDomain(domain);
 
     final uri = Uri.parse(_baseUrl).replace(
       queryParameters: {'name': cleanDomain, 'type': type.name.toUpperCase()},

@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../shared/utils/clipboard_helper.dart';
+import '../../shared/widgets/terminal_output.dart';
+import 'dns_service.dart';
 import 'network_controller.dart';
 
 const _background = Color(0xFFF8FAFC);
@@ -13,9 +15,6 @@ const _muted = Color(0xFF64748B);
 const _label = Color(0xFF334155);
 const _border = Color(0xFFE2E8F0);
 const _controlBorder = Color(0xFFCBD5E1);
-const _terminal = Color(0xFF020617);
-const _terminalMuted = Color(0xFF94A3B8);
-const _terminalText = Color(0xFFE2E8F0);
 
 class NetworkScreen extends StatefulWidget {
   const NetworkScreen({super.key});
@@ -443,56 +442,6 @@ class _SegmentButton extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _Terminal extends StatelessWidget {
-  const _Terminal({required this.lines});
-
-  final List<String> lines;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 480,
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      decoration: BoxDecoration(
-        color: _terminal,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Live Output',
-            style: TextStyle(
-              color: _terminalMuted,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: SingleChildScrollView(
-              child: SelectableText(
-                lines.isEmpty
-                    ? 'No results yet. Enter input and run the tool.'
-                    : lines.join('\n'),
-                style: TextStyle(
-                  color: lines.isEmpty ? _terminalMuted : _terminalText,
-                  fontFamily: 'monospace',
-                  fontSize: 13,
-                  height: 1.45,
-                  letterSpacing: 0,
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
